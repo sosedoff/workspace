@@ -6,9 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"golang.org/x/crypto/ssh/terminal"
-
 	"github.com/keybase/go-keychain"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 func exitWithError(err interface{}) {
