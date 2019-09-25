@@ -90,3 +90,19 @@ func (w Workspace) fetch(file string) error {
 
 	return ioutil.WriteFile(dstPath, []byte(raw), 0644)
 }
+
+func (w Workspace) read(file string) (string, error) {
+	srcPath := filepath.Join(w.storePath, file)
+
+	data, err := ioutil.ReadFile(srcPath)
+	if err != nil {
+		return "", err
+	}
+
+	raw, err := vault.Decrypt(string(data), w.pass)
+	if err != nil {
+		return "", err
+	}
+
+	return raw, nil
+}

@@ -35,9 +35,29 @@ func listWorkspaceFiles(workspace Workspace) {
 }
 
 func addWorkspaceFile(workspace Workspace, file string) {
-	log.Println("adding", file, "to workspace")
-	if err := workspace.add(file); err != nil {
-		exitWithError(err)
+	items := []string{}
+
+	if file == "." {
+		filepath.Walk(workspace.localPath, func(path string, info os.FileInfo, err error) error {
+			if info.IsDir() {
+				return nil
+			}
+			items = append(items, filepath.Base(path))
+			return nil
+		})
+
+		for _, item := range items {
+			log.Println("---", item)
+		}
+	} else {
+		items = append(items, file)
+	}
+
+	for _, item := range items {
+		log.Println("adding", item, "to workspace")
+		if err := workspace.add(item); err != nil {
+			exitWithError(err)
+		}
 	}
 }
 
@@ -86,11 +106,19 @@ func fetchWorkspace(workspace Workspace) {
 	}
 
 	for _, file := range files {
-		fmt.Println("adding", file)
+		fmt.Println("fetching", file)
 		if err := workspace.fetch(file); err != nil {
 			exitWithError(err)
 		}
 	}
+}
+
+func showWorkspaceFile(workspace Workspace, file string) {
+	content, err := workspace.read(file)
+	if err != nil {
+		exitWithError(err)
+	}
+	fmt.Println(content)
 }
 
 func main() {
@@ -121,7 +149,7 @@ func main() {
 	switch args[0] {
 	case "init":
 		initWorkspace(workspace)
-	case "list":
+	case "ls", "list":
 		requireWorkspace(workspace, listWorkspaceFiles)
 	case "add":
 		if len(args) < 2 {
@@ -130,6 +158,20 @@ func main() {
 		}
 		requireWorkspace(workspace, func(workspace Workspace) {
 			addWorkspaceFile(workspace, args[1])
+		})
+	case "info":
+		requireWorkspace(workspace, func(workspace Workspace) {
+			fmt.Println("workspace info:")
+			fmt.Println("local path:", workspace.localPath)
+			fmt.Println("store path:", workspace.storePath)
+		})
+	case "show":
+		if len(args) < 2 {
+			exitWithError("please provide a file name")
+			return
+		}
+		requireWorkspace(workspace, func(worker Workspace) {
+			showWorkspaceFile(workspace, args[1])
 		})
 	case "fetch":
 		requireWorkspace(workspace, fetchWorkspace)
