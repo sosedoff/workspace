@@ -32,7 +32,7 @@ func cmdAdd() Command {
 	return Command{
 		name:        "add",
 		description: "Add a new file or directory to the workspace",
-		handler:     requireWorkspace(handleAdd),
+		handler:     requireWorkspace(requireFile(handleAdd)),
 	}
 }
 
@@ -41,7 +41,7 @@ func cmdRemove() Command {
 		name:        "remove",
 		alias:       "rm",
 		description: "Remove a file from the workspace",
-		handler:     requireWorkspace(handleRemove),
+		handler:     requireWorkspace(requireFile(handleRemove)),
 	}
 }
 
@@ -57,7 +57,7 @@ func cmdShow() Command {
 	return Command{
 		name:        "show",
 		description: "Show file contents",
-		handler:     requireWorkspace(handleShow),
+		handler:     requireWorkspace(requireFile(handleShow)),
 	}
 }
 

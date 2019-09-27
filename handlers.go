@@ -15,6 +15,15 @@ func requireWorkspace(next HandlerFunc) HandlerFunc {
 	}
 }
 
+func requireFile(next HandlerFunc) HandlerFunc {
+	return func(w *Workspace, args []string) error {
+		if len(args) == 0 {
+			return errFileRequired
+		}
+		return next(w, args)
+	}
+}
+
 func handleInit(w *Workspace, args []string) error {
 	if w.exists() {
 		return errWorkspaceExists
@@ -37,10 +46,6 @@ func handleList(w *Workspace, args []string) error {
 }
 
 func handleAdd(w *Workspace, args []string) error {
-	if len(args) == 0 {
-		return errFileRequired
-	}
-
 	file := args[0]
 	items := []string{}
 
@@ -84,17 +89,10 @@ func handleFetch(w *Workspace, args []string) error {
 }
 
 func handleRemove(w *Workspace, args []string) error {
-	if len(args) == 0 {
-		return errFileRequired
-	}
 	return w.remove(args[0])
 }
 
 func handleShow(w *Workspace, args []string) error {
-	if len(args) == 0 {
-		return errFileRequired
-	}
-
 	content, err := w.read(args[0])
 	if err != nil {
 		return err
