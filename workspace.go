@@ -11,35 +11,36 @@ import (
 )
 
 type Workspace struct {
+	user      string
 	pass      string
 	key       string
 	localPath string
 	storePath string
 }
 
-func workspaceForPath(path string, storePath string) Workspace {
+func workspaceForPath(path string, storePath string) *Workspace {
 	key := fmt.Sprintf("%x", sha1.Sum([]byte(path)))
 
-	return Workspace{
+	return &Workspace{
 		key:       key,
 		storePath: filepath.Join(storePath, key),
 		localPath: path,
 	}
 }
 
-func (w Workspace) exists() bool {
+func (w *Workspace) exists() bool {
 	_, err := os.Stat(w.storePath)
 	return err == nil
 }
 
-func (w Workspace) init() error {
+func (w *Workspace) init() error {
 	if err := os.MkdirAll(w.storePath, 0700); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (w Workspace) list() ([]string, error) {
+func (w *Workspace) list() ([]string, error) {
 	items := []string{}
 	filepath.Walk(w.storePath, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
@@ -51,7 +52,7 @@ func (w Workspace) list() ([]string, error) {
 	return items, nil
 }
 
-func (w Workspace) add(file string) error {
+func (w *Workspace) add(file string) error {
 	fullPath := filepath.Join(w.localPath, file)
 	if _, err := os.Stat(fullPath); err != nil {
 		return err
@@ -75,11 +76,11 @@ func (w Workspace) add(file string) error {
 }
 
 // remove removes the file from the workspace
-func (w Workspace) remove(file string) error {
+func (w *Workspace) remove(file string) error {
 	return os.Remove(filepath.Join(w.storePath, file))
 }
 
-func (w Workspace) fetch(file string) error {
+func (w *Workspace) fetch(file string) error {
 	srcPath := filepath.Join(w.storePath, file)
 	dstPath := filepath.Join(w.localPath, file)
 
@@ -96,7 +97,7 @@ func (w Workspace) fetch(file string) error {
 	return ioutil.WriteFile(dstPath, []byte(raw), 0644)
 }
 
-func (w Workspace) read(file string) (string, error) {
+func (w *Workspace) read(file string) (string, error) {
 	srcPath := filepath.Join(w.storePath, file)
 
 	data, err := ioutil.ReadFile(srcPath)
@@ -110,4 +111,9 @@ func (w Workspace) read(file string) (string, error) {
 	}
 
 	return raw, nil
+}
+
+// destroy deletes the workspace files from the storage directory
+func (w *Workspace) destroy() error {
+	return os.RemoveAll(w.storePath)
 }
