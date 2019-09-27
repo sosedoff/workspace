@@ -61,6 +61,12 @@ func addWorkspaceFile(workspace Workspace, file string) {
 	}
 }
 
+func removeWorkspaceFile(workspace Workspace, file string) {
+	if err := workspace.remove(file); err != nil {
+		exitWithError(err)
+	}
+}
+
 func initWorkspace(workspace Workspace) {
 	if workspace.exists() {
 		return
@@ -158,6 +164,14 @@ func main() {
 		}
 		requireWorkspace(workspace, func(workspace Workspace) {
 			addWorkspaceFile(workspace, args[1])
+		})
+	case "rm", "remove":
+		if len(args) < 2 {
+			exitWithError("file required")
+			return
+		}
+		requireWorkspace(workspace, func(workspace Workspace) {
+			removeWorkspaceFile(workspace, args[1])
 		})
 	case "info":
 		requireWorkspace(workspace, func(workspace Workspace) {

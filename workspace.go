@@ -74,6 +74,11 @@ func (w Workspace) add(file string) error {
 	return nil
 }
 
+// remove removes the file from the workspace
+func (w Workspace) remove(file string) error {
+	return os.Remove(filepath.Join(w.storePath, file))
+}
+
 func (w Workspace) fetch(file string) error {
 	srcPath := filepath.Join(w.storePath, file)
 	dstPath := filepath.Join(w.localPath, file)
