@@ -31,6 +31,7 @@ func main() {
 
 	runner.register(
 		cmdInit(),
+		cmdFetch(),
 		cmdAdd(),
 		cmdRemove(),
 		cmdShow(),
