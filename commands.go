@@ -76,3 +76,11 @@ func cmdDestroy() Command {
 		handler:     requireWorkspace(handleDestroy),
 	}
 }
+
+func cmdBackup() Command {
+	return Command{
+		name:        "backup",
+		description: "Backup current store file",
+		handler:     requireWorkspace(handleBackup),
+	}
+}

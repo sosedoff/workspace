@@ -1,14 +1,24 @@
 package main
 
 import (
-	"crypto/sha1"
-	"fmt"
+	"encoding/json"
+	"errors"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	vault "github.com/sosedoff/ansible-vault-go"
 )
+
+type Entry struct {
+	Path string `json:"path"`
+	Size int64  `json:"size"`
+	Mode uint32 `json:"mode"`
+	Time string `json:"time"`
+	Data string `json:"data"`
+}
 
 type Workspace struct {
 	user      string
@@ -16,16 +26,34 @@ type Workspace struct {
 	key       string
 	localPath string
 	storePath string
+	entries   map[string]Entry
+	logger    *log.Logger
+	debug     bool
 }
 
 func workspaceForPath(path string, storePath string) *Workspace {
-	key := fmt.Sprintf("%x", sha1.Sum([]byte(path)))
-
 	return &Workspace{
-		key:       key,
-		storePath: filepath.Join(storePath, key),
+		storePath: storePath,
 		localPath: path,
+		entries:   map[string]Entry{},
+		logger:    log.New(os.Stderr, "", log.LstdFlags),
 	}
+}
+
+func (w *Workspace) writeEntriesFile() error {
+	data, err := json.Marshal(w.entries)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(w.storePath, data, 0600)
+}
+
+func (w *Workspace) readEntriesFile() error {
+	data, err := ioutil.ReadFile(w.storePath)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, &w.entries)
 }
 
 func (w *Workspace) exists() bool {
@@ -34,86 +62,105 @@ func (w *Workspace) exists() bool {
 }
 
 func (w *Workspace) init() error {
-	if err := os.MkdirAll(w.storePath, 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(w.storePath), 0750); err != nil {
 		return err
 	}
-	return nil
+	return w.writeEntriesFile()
 }
 
 func (w *Workspace) list() ([]string, error) {
 	items := []string{}
-	filepath.Walk(w.storePath, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
-			return nil
-		}
-		items = append(items, filepath.Base(path))
-		return nil
-	})
+	for k := range w.entries {
+		items = append(items, k)
+	}
 	return items, nil
 }
 
-func (w *Workspace) add(file string) error {
-	fullPath := filepath.Join(w.localPath, file)
-	if _, err := os.Stat(fullPath); err != nil {
-		return err
-	}
-
-	data, err := ioutil.ReadFile(fullPath)
+// add adds a new file to the workspace
+func (w *Workspace) add(path string) error {
+	fullpath, err := filepath.Abs(path)
 	if err != nil {
 		return err
 	}
 
-	dstPath := filepath.Join(w.storePath, file)
-	if err := os.MkdirAll(filepath.Dir(dstPath), 0700); err != nil {
-		return err
-	}
-
-	err = vault.EncryptFile(dstPath, string(data), w.pass)
+	stat, err := os.Stat(fullpath)
 	if err != nil {
 		return err
 	}
+
+	data, err := ioutil.ReadFile(fullpath)
+	if err != nil {
+		return err
+	}
+
+	encoded, err := vault.Encrypt(string(data), w.pass)
+	if err != nil {
+		return err
+	}
+
+	w.entries[fullpath] = Entry{
+		Path: fullpath,
+		Size: stat.Size(),
+		Mode: uint32(stat.Mode()),
+		Time: stat.ModTime().UTC().Format(time.RFC3339),
+		Data: encoded,
+	}
+
 	return nil
 }
 
 // remove removes the file from the workspace
-func (w *Workspace) remove(file string) error {
-	return os.Remove(filepath.Join(w.storePath, file))
+func (w *Workspace) remove(path string) error {
+	if _, ok := w.entries[path]; !ok {
+		return nil
+	}
+	delete(w.entries, path)
+
+	return w.writeEntriesFile()
 }
 
-func (w *Workspace) fetch(file string) error {
-	srcPath := filepath.Join(w.storePath, file)
-	dstPath := filepath.Join(w.localPath, file)
+func (w *Workspace) fetch(path string) error {
+	entry, ok := w.entries[path]
+	if !ok {
+		return errors.New("file is not tracked in workspace")
+	}
 
-	data, err := ioutil.ReadFile(srcPath)
+	decoded, err := vault.Decrypt(entry.Data, w.pass)
 	if err != nil {
 		return err
 	}
 
-	raw, err := vault.Decrypt(string(data), w.pass)
-	if err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile(dstPath, []byte(raw), 0644)
+	if err := ioutil.WriteFile(path, []byte(decoded), 0600); err != nil {
+		return err
+	}
+
+	return os.Chmod(path, os.FileMode(entry.Mode))
 }
 
-func (w *Workspace) read(file string) (string, error) {
-	srcPath := filepath.Join(w.storePath, file)
+func (w *Workspace) read(path string) (string, error) {
+	entry, ok := w.entries[path]
+	if !ok {
+		return "", errors.New("file is not tracked in workspace")
+	}
 
-	data, err := ioutil.ReadFile(srcPath)
+	decoded, err := vault.Decrypt(entry.Data, w.pass)
 	if err != nil {
 		return "", err
 	}
 
-	raw, err := vault.Decrypt(string(data), w.pass)
-	if err != nil {
-		return "", err
-	}
-
-	return raw, nil
+	return decoded, nil
 }
 
-// destroy deletes the workspace files from the storage directory
 func (w *Workspace) destroy() error {
-	return os.RemoveAll(w.storePath)
+	return os.Remove(w.storePath)
+}
+
+func (w *Workspace) log(args ...interface{}) {
+	if w.debug {
+		w.logger.Println(args...)
+	}
 }

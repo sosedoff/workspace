@@ -5,17 +5,26 @@ import (
 	"path/filepath"
 )
 
+func getStorePath() (string, error) {
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "dropbox/workspace/config.json"), nil
+}
+
 func main() {
+	storePath, err := getStorePath()
+	if err != nil {
+		exitWithError(err)
+		return
+	}
+
 	dir, err := os.Getwd()
 	if err != nil {
 		exitWithError(err)
+		return
 	}
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		exitWithError(err)
-	}
-	storePath := filepath.Join(homeDir, "dropbox", "_workspace")
 
 	workspace := workspaceForPath(dir, storePath)
 
@@ -26,6 +35,13 @@ func main() {
 			return err
 		}
 		workspace.pass = pass
+
+		if workspace.exists() {
+			if err := workspace.readEntriesFile(); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	}
 
@@ -38,6 +54,7 @@ func main() {
 		cmdList(),
 		cmdInfo(),
 		cmdDestroy(),
+		cmdBackup(),
 	)
 
 	if err := runner.run(workspace, os.Args[1:]); err != nil {
