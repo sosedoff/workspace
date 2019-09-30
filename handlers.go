@@ -34,15 +34,14 @@ func handleInit(w *Workspace, args []string) error {
 }
 
 func handleList(w *Workspace, args []string) error {
-	files, err := w.list()
-	if err != nil {
-		return err
+	for _, entry := range w.entries {
+		fmt.Printf(
+			"file: %v, size: %v, mod: %v\n",
+			entry.Path,
+			entry.Size,
+			entry.Time,
+		)
 	}
-
-	for _, f := range files {
-		fmt.Println(f)
-	}
-
 	return nil
 }
 
