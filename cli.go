@@ -74,7 +74,8 @@ func (r *Runner) printUsage() {
 
 func (r *Runner) run(workspace *Workspace, args []string) error {
 	if len(args) == 0 {
-		return errors.New("command is required")
+		r.printUsage()
+		return nil
 	}
 
 	name := args[0]
