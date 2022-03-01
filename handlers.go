@@ -137,7 +137,20 @@ func handleRemove(w *Workspace, args []string) error {
 }
 
 func handleShow(w *Workspace, args []string) error {
-	content, err := w.read(args[0])
+	var match string
+
+	for _, entry := range w.entries {
+		if strings.ContainsAny(entry.Path, args[0]) {
+			match = entry.Path
+			break
+		}
+	}
+
+	if match == "" {
+		return fmt.Errorf("no files matched for %q", args[0])
+	}
+
+	content, err := w.read(match)
 	if err != nil {
 		return err
 	}
